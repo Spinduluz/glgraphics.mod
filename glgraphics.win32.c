@@ -38,20 +38,35 @@
 #define ERROR_INVALID_VERSION_ARB               0x2095
 #define ERROR_INVALID_PROFILE_ARB               0x2096
 
+#define GL_MAJOR_VERSION 0x821B
+#define GL_MINOR_VERSION 0x821C
+
 // FIXME: Implement wglCreateContextAttribsARB
 
 enum{
-	_BACKBUFFER=	0x2,
-	_ALPHABUFFER=	0x4,
-	_DEPTHBUFFER=	0x8,
-	_STENCILBUFFER=	0x10,
-	_ACCUMBUFFER=	0x20,
-	_AASAMPLES2=	0x40,
-	_AASAMPLES4=	0x80,
-	_AASAMPLES8=	0x100,
-	_AASAMPLES16=	0x200,
-	//0x400
-	//0x800
+	_BACKBUFFER=			0x2,
+	_ALPHABUFFER=			0x4,
+	_DEPTHBUFFER=			0x8,
+	_STENCILBUFFER=			0x10,
+	_ACCUMBUFFER=			0x20,
+	_MULTISAMPLES2=			0x40,
+	_MULTISAMPLES4=			0x80,
+	_MULTISAMPLES8=			0x100,
+	_MULTISAMPLES16=		0x200,
+	_CONTEXT_CORE=			0x400,
+	_CONTEXT_DEBUG=			0x800,
+	// Not a pretty solution but don't want to make to
+	// much changes to the MAX code
+	_CONTEXT_MAJORVERSION3=	0x1000,
+	_CONTEXT_MAJORVERSION4=	0x2000,
+	_CONTEXT_MAJORVERSION5=	0x4000, // Future version or is it only Vulkan from now on?
+	_CONTEXT_MINORVERSION1=	0x8000,
+	_CONTEXT_MINORVERSION2=	0x10000,
+	_CONTEXT_MINORVERSION3=	0x20000,
+	_CONTEXT_MINORVERSION4=	0x40000,
+	_CONTEXT_MINORVERSION5=	0x80000,
+	_CONTEXT_MINORVERSION6=	0x100000,
+	// 0x200000
 };
 
 enum{
@@ -124,6 +139,9 @@ void DebugLog(const char *format,...){
 
 static void _initPfd( PIXELFORMATDESCRIPTOR *pfd,int flags );
 
+static int _gl_majorversion=0;
+static int _gl_minorversion=0;
+
 static long _stdcall _fakeWinProc( HWND hwnd,UINT msg,WPARAM wp,LPARAM lp ){
 	if( msg==WM_DESTROY ) PostQuitMessage( 0 );
 	return DefWindowProc( hwnd,msg,wp,lp );
@@ -177,6 +195,15 @@ static void _checkWindowsExtension(){
 	_wglGetPixelFormatAttribfvARB=wglGetProcAddress( "wglGetPixelFormatAttribfvARB" );
 	_wglChoosePixelFormatARB=wglGetProcAddress( "wglChoosePixelFormatARB" );
 
+	_wglCreateContextAttribsARB=wglGetProcAddress( "wglCreateContextAttribsARB" );
+
+	glGetIntegerv( GL_MAJOR_VERSION,&_gl_majorversion );
+	glGetIntegerv( GL_MINOR_VERSION,&_gl_minorversion );
+	if( !_gl_majorversion ){
+		const char *ver=(const char*)glGetString( GL_VERSION );
+		sscanf( ver,"%i.%i",&_gl_majorversion,&_gl_minorversion );
+	}
+
 	wglDeleteContext( rc );
 	ReleaseDC( hwnd,dc );
 
@@ -189,7 +216,7 @@ static void _checkWindowsExtension(){
 		}
 	}else{
 		MSG msg;
-		while( GetMessageW( &msg,NULL,0,0 ) ){
+		while( GetMessageA( &msg,NULL,0,0 ) ){
 			TranslateMessage( &msg );
 			DispatchMessageA( &msg );
 		}
@@ -201,12 +228,10 @@ static int _choosePixelFormat( HDC hdc,int flags ){
 	int pf,samples=0;
 	UINT temp;
 
-	if( flags & _AASAMPLES2 ) samples=2;
-	if( flags & _AASAMPLES4 ) samples=4;
-	if( flags & _AASAMPLES8 ) samples=8;
-	if( flags & _AASAMPLES16) samples=16;
-
-
+	if( flags & _MULTISAMPLES2 ) samples=2;
+	if( flags & _MULTISAMPLES4 ) samples=4;
+	if( flags & _MULTISAMPLES8 ) samples=8;
+	if( flags & _MULTISAMPLES16) samples=16;
 
 	{
 		int iattrib[]={
@@ -239,6 +264,41 @@ static int _choosePixelFormat( HDC hdc,int flags ){
 			}
 		}	
 		return pf;
+	}
+}
+
+static HGLRC _createContext( HDC hdc,HGLRC shared,int flags ){
+	int major=0,minor=0,core=0;
+	
+	// Just create a legacy context
+	if( _gl_majorversion<3 ) return NULL;
+
+	if( flags & _CONTEXT_MAJORVERSION3 ) major=3;
+	if( flags & _CONTEXT_MAJORVERSION4 ) major=4;
+	if( flags & _CONTEXT_MAJORVERSION5 ) major=5;
+
+	if( flags & _CONTEXT_MINORVERSION1 ) minor=1;
+	if( flags & _CONTEXT_MINORVERSION2 ) minor=2;
+	if( flags & _CONTEXT_MINORVERSION3 ) minor=3;
+	if( flags & _CONTEXT_MINORVERSION4 ) minor=4;
+	if( flags & _CONTEXT_MINORVERSION5 ) minor=5;
+	if( flags & _CONTEXT_MINORVERSION6 ) minor=6;
+
+	if( major>_gl_majorversion ) major=_gl_majorversion;
+	if( major==3 && minor>3 ) minor=3;
+
+	if( flags & _CONTEXT_CORE ) core=1;
+
+	{
+		int attribs[]={
+			WGL_CONTEXT_MAJOR_VERSION_ARB,major,
+			WGL_CONTEXT_MINOR_VERSION_ARB,minor,
+			WGL_CONTEXT_FLAGS_ARB,( flags & _CONTEXT_DEBUG ) ? WGL_CONTEXT_DEBUG_BIT_ARB : 0,
+			WGL_CONTEXT_PROFILE_MASK_ARB,core ? WGL_CONTEXT_CORE_PROFILE_BIT_ARB : WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+			0
+		};
+
+		return _wglCreateContextAttribsARB( hdc,shared,attribs );
 	}
 }
 
@@ -559,7 +619,12 @@ BBGLContext *bbGLGraphicsCreateGraphics( int width,int height,int depth,int hert
 	}
 
 	SetPixelFormat( hdc,pf,&pfd );
-	hglrc=wglCreateContext( hdc );
+	if ( !_wglCreateContextAttribsARB ){
+		hglrc=wglCreateContext( hdc );
+	}else{
+		hglrc=_createContext( hdc,NULL,flags );
+		if( !hglrc ) hglrc=wglCreateContext( hdc );
+	}
 	
 	if( _sharedContext ) wglShareLists( _sharedContext->hglrc,hglrc );
 	

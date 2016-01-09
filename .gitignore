@@ -15,6 +15,7 @@ backup/
 *.sln
 *.vcxproj
 *.filters
+*.txt
 
 #################
 ## Eclipse

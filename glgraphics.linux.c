@@ -9,6 +9,9 @@
 #include <brl.mod/blitz.mod/blitz.h>
 #include <X11/Xutil.h>
 
+#define GLX_SAMPLE_BUFFERS_ARB               100000
+#define GLX_SAMPLES_ARB                      100001
+
 extern void bbSystemPoll();
 extern Display *bbSystemDisplay();
 extern void bbSetSystemWindow(int window);
