@@ -13,11 +13,11 @@ enum{
 	_DEPTHBUFFER=	0x8,
 	_STENCILBUFFER=	0x10,
 	_ACCUMBUFFER=	0x20,
-	_SAMPLEBUFFER=	0x40,
-	_AASAMPLES2=	0x80,
-	_AASAMPLES4=	0x100,
-	_AASAMPLES8=	0x200,
-	_AASAMPLES16=	0x400,
+	_AASAMPLES2=	0x40,
+	_AASAMPLES4=	0x80,
+	_AASAMPLES8=	0x100,
+	_AASAMPLES16=	0x200,
+	//0x400
 	//0x800
 };
 
@@ -172,10 +172,12 @@ static int _choosePixelFormat( HDC hdc,int flags ){
 	if( flags & _AASAMPLES8 ) samples=8;
 	if( flags & _AASAMPLES16) samples=16;
 
+
+
 	{
 		int iattrib[]={
-			WGL_SAMPLE_BUFFERS_ARB,(flags & _SAMPLEBUFFER) ? TRUE : FALSE,
-			WGL_SAMPLES_ARB,iattrib[1] ? samples : 0,
+			WGL_SAMPLE_BUFFERS_ARB,samples ? TRUE : FALSE,
+			WGL_SAMPLES_ARB,samples ? samples : 0,
 			WGL_DOUBLE_BUFFER_ARB,(flags & _BACKBUFFER) ? TRUE : FALSE,
 			WGL_STENCIL_BITS_ARB,(flags & _STENCILBUFFER) ? 8 : 0,
 			WGL_DEPTH_BITS_ARB,(flags & _DEPTHBUFFER) ? 24 : 0,
