@@ -1,9 +1,42 @@
 
 #include <windows.h>
 
+#include <gl/gl.h>
+
 #include <brl.mod/system.mod/system.h>
-#include <pub.mod/glew.mod/GL/glew.h>
-#include <pub.mod/glew.mod/GL/wglew.h>
+
+#define WGL_ACCELERATION_ARB                    0x2003
+#define WGL_DOUBLE_BUFFER_ARB                   0x2011
+#define WGL_STEREO_ARB                          0x2012
+#define WGL_RED_BITS_ARB                        0x2015
+#define WGL_GREEN_BITS_ARB                      0x2017
+#define WGL_BLUE_BITS_ARB                       0x2019
+#define WGL_ALPHA_BITS_ARB                      0x201B
+#define WGL_ACCUM_BITS_ARB                      0x201D
+#define WGL_DEPTH_BITS_ARB                      0x2022
+#define WGL_STENCIL_BITS_ARB                    0x2023
+#define WGL_SAMPLE_BUFFERS_ARB					0x2041
+#define WGL_SAMPLES_ARB							0x2042
+
+#define WGL_NO_ACCELERATION_ARB                 0x2025
+#define WGL_GENERIC_ACCELERATION_ARB            0x2026
+#define WGL_FULL_ACCELERATION_ARB               0x2027
+
+#define WGL_CONTEXT_MAJOR_VERSION_ARB           0x2091
+#define WGL_CONTEXT_MINOR_VERSION_ARB           0x2092
+#define WGL_CONTEXT_LAYER_PLANE_ARB             0x2093
+#define WGL_CONTEXT_FLAGS_ARB                   0x2094
+#define WGL_CONTEXT_PROFILE_MASK_ARB            0x9126
+
+#define WGL_CONTEXT_DEBUG_BIT_ARB               0x0001
+#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB  0x0002
+
+#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB        0x00000001
+#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
+
+// GetLastError
+#define ERROR_INVALID_VERSION_ARB               0x2095
+#define ERROR_INVALID_PROFILE_ARB               0x2096
 
 // FIXME: Implement wglCreateContextAttribsARB
 
@@ -51,12 +84,13 @@ static BBGLContext *_contexts;
 static BBGLContext *_sharedContext;
 static BBGLContext *_currentContext;
 
-static PFNWGLGETPIXELFORMATATTRIBFVARBPROC _wglGetPixelFormatAttribfvARB=NULL;
-static PFNWGLGETPIXELFORMATATTRIBIVARBPROC _wglGetPixelFormatAttribivARB=NULL;
-static PFNWGLCHOOSEPIXELFORMATARBPROC _wglChoosePixelFormatARB=NULL;
-static PFNWGLCREATECONTEXTATTRIBSARBPROC _wglCreateContextAttribsARB=NULL;
-
 typedef BOOL (APIENTRY * WGLSWAPINTERVALEXT) (int);
+
+static BOOL (APIENTRY* _wglGetPixelFormatAttribfvARB)(HDC,int,int,UINT,const int *,FLOAT *)=NULL;
+static BOOL (APIENTRY* _wglGetPixelFormatAttribivARB)(HDC,int,int,UINT,const int *,FLOAT *)=NULL;
+static BOOL (APIENTRY* _wglChoosePixelFormatARB)(HDC,const int *,const FLOAT *,UINT,int *,UINT *)=NULL;
+
+static HGLRC (APIENTRY* _wglCreateContextAttribsARB)(HDC, HGLRC,const int *)=NULL;
 
 void bbGLGraphicsClose( BBGLContext *context );
 void bbGLGraphicsGetSettings( BBGLContext *context,int *width,int *height,int *depth,int *hertz,int *flags );
@@ -179,14 +213,15 @@ static int _choosePixelFormat( HDC hdc,int flags ){
 			WGL_SAMPLE_BUFFERS_ARB,samples ? TRUE : FALSE,
 			WGL_SAMPLES_ARB,samples ? samples : 0,
 			WGL_DOUBLE_BUFFER_ARB,(flags & _BACKBUFFER) ? TRUE : FALSE,
-			WGL_STENCIL_BITS_ARB,(flags & _STENCILBUFFER) ? 8 : 0,
-			WGL_DEPTH_BITS_ARB,(flags & _DEPTHBUFFER) ? 24 : 0,
 			WGL_RED_BITS_ARB,8,
 			WGL_BLUE_BITS_ARB,8,
 			WGL_GREEN_BITS_ARB,8,
 			WGL_ALPHA_BITS_ARB,(flags & _ALPHABUFFER) ? 8 : 0,
-			WGL_STEREO_ARB,0,
 			WGL_ACCUM_BITS_ARB,(flags & _ACCUMBUFFER) ? 8 : 0,
+			WGL_DEPTH_BITS_ARB,(flags & _DEPTHBUFFER) ? 24 : 0,
+			WGL_STENCIL_BITS_ARB,(flags & _STENCILBUFFER) ? 8 : 0,
+			WGL_STEREO_ARB,0,
+			WGL_ACCELERATION_ARB,WGL_FULL_ACCELERATION_ARB,
 			0,0
 		};
 
